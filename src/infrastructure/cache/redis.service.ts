@@ -11,32 +11,41 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const port = this.configService.get<number>('REDIS_PORT', 6379);
-    const password = this.configService.get<string>('REDIS_PASSWORD');
-    const db = this.configService.get<number>('REDIS_DB', 0);
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const host = this.configService.get<string>('REDIS_HOST') || this.configService.get<string>('REDISHOST', 'localhost');
+    const port = Number(this.configService.get<number>('REDIS_PORT') || this.configService.get<number>('REDISPORT', 6379));
+    const password = this.configService.get<string>('REDIS_PASSWORD') || this.configService.get<string>('REDISPASSWORD');
+    const db = Number(this.configService.get<number>('REDIS_DB', 0));
     const keyPrefix = this.configService.get<string>('REDIS_KEY_PREFIX', 'transespol:');
 
-    this.client = new Redis({
-      host,
-      port,
-      password: password || undefined,
-      db,
+    const commonOptions = {
       keyPrefix,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
-      retryStrategy: (times) => {
+      retryStrategy: (times: number) => {
         if (times > 5) {
           this.logger.warn(' Redis retry limit reached. Falling back to internal memory cache.');
           return null;
         }
         return Math.min(times * 500, 2000);
       },
-    });
+    };
+
+    if (redisUrl) {
+      this.client = new Redis(redisUrl, commonOptions);
+    } else {
+      this.client = new Redis({
+        host,
+        port,
+        password: password || undefined,
+        db,
+        ...commonOptions,
+      });
+    }
 
     this.client.on('connect', () => {
       this.isConnected = true;
-      this.logger.log(` Connected to Redis at ${host}:${port} (prefix: ${keyPrefix})`);
+      this.logger.log(` Connected to Redis (prefix: ${keyPrefix})`);
     });
 
     this.client.on('error', (err) => {
