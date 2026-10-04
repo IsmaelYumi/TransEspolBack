@@ -1,13 +1,19 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, Logger } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { JwtTokenService } from './jwt-token.service';
+import {
+  ITokenService,
+  TOKEN_SERVICE_TOKEN,
+} from '../../application/ports/token.service.interface';
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
 
-  constructor(private readonly jwtTokenService: JwtTokenService) {}
+  constructor(
+    @Inject(TOKEN_SERVICE_TOKEN)
+    private readonly jwtTokenService: ITokenService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient<Socket>();

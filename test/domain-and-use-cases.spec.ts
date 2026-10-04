@@ -162,3 +162,44 @@ describe('PlanJourneyUseCase (ESPOL Move Alert Rule: Rutas atómicas, sin invent
     expect(result.recommendedOption.estimatedArrivalNotice).toContain('Tiempo real no disponible');
   });
 });
+
+describe('AuthModule Dependency Injection', () => {
+  it('should compile AuthModule and resolve WsJwtGuard dependencies without error', async () => {
+    const { Test } = await import('@nestjs/testing');
+    const { AuthModule } = await import('../src/modules/auth.module');
+    const { ConfigModule } = await import('@nestjs/config');
+    const { USER_REPOSITORY_TOKEN } = await import('../src/domain/repositories/user.repository.interface');
+    const { WsJwtGuard } = await import('../src/infrastructure/auth/ws-jwt.guard');
+
+    const { Global, Module } = await import('@nestjs/common');
+
+    @Global()
+    @Module({
+      providers: [
+        {
+          provide: USER_REPOSITORY_TOKEN,
+          useValue: {
+            findByEmail: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+          },
+        },
+      ],
+      exports: [USER_REPOSITORY_TOKEN],
+    })
+    class MockDbModule {}
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        MockDbModule,
+        AuthModule,
+      ],
+    }).compile();
+
+    expect(moduleRef).toBeDefined();
+    const guard = moduleRef.get(WsJwtGuard);
+    expect(guard).toBeDefined();
+  });
+});
+

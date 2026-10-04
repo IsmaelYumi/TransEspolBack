@@ -29,18 +29,20 @@ import { TOKEN_SERVICE_TOKEN } from '../application/ports/token.service.interfac
     LoginWithMicrosoftUseCase,
     JwtStrategy,
     WsJwtGuard,
+    JwtTokenService,
     {
       provide: MICROSOFT_AUTH_SERVICE_TOKEN,
       useClass: MicrosoftAuthService,
     },
     {
       provide: TOKEN_SERVICE_TOKEN,
-      useClass: JwtTokenService,
+      useExisting: JwtTokenService,
     },
   ],
   exports: [
     TOKEN_SERVICE_TOKEN,
     MICROSOFT_AUTH_SERVICE_TOKEN,
+    JwtTokenService,
     WsJwtGuard,
     JwtModule,
   ],
