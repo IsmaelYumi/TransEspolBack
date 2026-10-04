@@ -1,0 +1,497 @@
+// Prisma Schema v7 for ESPOL MOVE ALERT - Mobility Backend
+// Single Source of Truth for ESPOL Mobility Services
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 1. Identity & Access
+// ==========================================
+
+enum UserRole {
+  PASSENGER  // Estudiante / Comunidad general (Strictly Read-Only)
+  OPERATOR   // Conductor / Despachador / Operador de campo
+  ADMIN      // Administrador de transporte y movilidad
+}
+
+model User {
+  id              String       @id @default(uuid()) @db.Uuid
+  email           String       @unique
+  name            String
+  institutionalId String?      @unique // Matrícula o nómina ESPOL
+  role            UserRole     @default(PASSENGER)
+  avatarUrl       String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relaciones
+  tripsAsDriver   Trip[]       @relation("DriverTrips")
+  createdAlerts   Alert[]      @relation("AlertCreator")
+  createdIncidents Incident[]  @relation("IncidentCreator")
+  auditLogs       AuditLog[]   @relation("UserAudits")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ==========================================
+// 2. Campus & Geospatial
+// ==========================================
+
+model Campus {
+  id          String       @id @default(uuid()) @db.Uuid
+  code        String       @unique // e.g., 'PROSPERINA', 'LAS_PENAS'
+  name        String       // Campus Gustavo Galindo Velasco
+  description String?
+  latitude    Float        @default(-2.1465)
+  longitude   Float        @default(-79.9664)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  buildings   Building[]
+  stops       Stop[]
+
+  @@map("campuses")
+}
+
+model Building {
+  id          String            @id @default(uuid()) @db.Uuid
+  campusId    String            @db.Uuid
+  code        String            @unique // e.g., 'EDIF-FIEC-32', 'EDIF-RECTORADO'
+  name        String            // Facultad de Ingeniería en Electricidad y Computación
+  faculty     String?           // FIEC, FIMCP, FCNM, FCSH, FADCOM, etc.
+  latitude    Float
+  longitude   Float
+  elevation   Float?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  campus      Campus            @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  pois        PointOfInterest[]
+
+  @@index([campusId])
+  @@map("buildings")
+}
+
+enum PoiType {
+  FACULTY
+  LABORATORY
+  LIBRARY
+  ADMINISTRATION
+  CAFETERIA
+  SPORTS
+  AUDITORIUM
+  OTHER
+}
+
+model PointOfInterest {
+  id          String       @id @default(uuid()) @db.Uuid
+  buildingId  String?      @db.Uuid
+  name        String       // e.g. "CIDIS", "Gimnasio ESPOL", "Rectorado"
+  type        PoiType      @default(FACULTY)
+  description String?
+  latitude    Float
+  longitude   Float
+  elevation   Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  building    Building?    @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+
+  @@index([latitude, longitude])
+  @@map("points_of_interest")
+}
+
+// ==========================================
+// 3. Stops (Paradas)
+// ==========================================
+
+enum StopStatus {
+  ACTIVE
+  TEMPORARILY_CLOSED
+  INACTIVE
+}
+
+enum StopType {
+  STANDARD
+  TERMINAL
+  SHELTER
+}
+
+model Stop {
+  id          String       @id @default(uuid()) @db.Uuid
+  campusId    String?      @db.Uuid
+  code        String       @unique // e.g., 'ST-GARITA', 'ST-FIEC', 'ST-GIMNASIO'
+  name        String       // e.g. "Parada FIEC / CIDIS"
+  description String?
+  type        StopType     @default(STANDARD)
+  status      StopStatus   @default(ACTIVE)
+  latitude    Float
+  longitude   Float
+  elevation   Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  campus      Campus?      @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  routeStops  RouteStop[]
+  alerts      Alert[]
+  incidents   Incident[]
+
+  @@index([latitude, longitude])
+  @@index([status])
+  @@map("stops")
+}
+
+// ==========================================
+// 4. Routes (Rutas independientes y atómicas)
+// ==========================================
+
+enum RouteDirection {
+  INBOUND   // ENTRADA (Hacia Terminal/Campus)
+  OUTBOUND  // SALIDA (Hacia Garita/Exterior)
+}
+
+enum RouteServiceType {
+  NORMAL
+  EXPRESS
+  ALTERNATIVE
+}
+
+enum RouteStatus {
+  ACTIVE
+  INACTIVE
+  DETOUR
+}
+
+model Route {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique // e.g., 'R-ENTRADA-NORMAL', 'R-SALIDA-ALTERNA'
+  name        String           // e.g., "Entrada Normal (Garita -> Terminal)"
+  description String?
+  direction   RouteDirection   @default(INBOUND)
+  serviceType RouteServiceType @default(NORMAL)
+  status      RouteStatus      @default(ACTIVE)
+  colorHex    String           @default("#003366") // Azul institucional ESPOL
+  polyline    String?          @db.Text // Encoded polyline o GeoJSON
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  routeStops  RouteStop[]
+  schedules   Schedule[]
+  trips       Trip[]
+  alerts      Alert[]
+  incidents   Incident[]
+
+  @@index([code])
+  @@index([status])
+  @@index([direction])
+  @@map("routes")
+}
+
+model RouteStop {
+  id                     String    @id @default(uuid()) @db.Uuid
+  routeId                String    @db.Uuid
+  stopId                 String    @db.Uuid
+  sequence               Int       // Orden estricto en la ruta (1, 2, 3...)
+  pickupAllowed          Boolean   @default(true) // Regla: Permitido recoger pasajeros
+  dropoffAllowed         Boolean   @default(true) // Regla: Permitido desembarcar pasajeros
+  estimatedOffsetSeconds Int?      // Desfase estimado en segundos desde origen
+
+  route                  Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop                   Stop      @relation(fields: [stopId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, stopId])
+  @@unique([routeId, sequence])
+  @@index([routeId])
+  @@index([stopId])
+  @@map("route_stops")
+}
+
+// ==========================================
+// 5. Schedules (Horarios)
+// ==========================================
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Schedule {
+  id               String          @id @default(uuid()) @db.Uuid
+  routeId          String          @db.Uuid
+  dayOfWeek        DayOfWeek
+  startTime        String          // Format: "HH:mm" e.g., "06:30"
+  endTime          String          // Format: "HH:mm" e.g., "20:30"
+  frequencyMinutes Int             @default(15) // Frecuencia estimada en minutos
+  validFrom        DateTime        @default(now())
+  validTo          DateTime?
+  status           ScheduleStatus  @default(ACTIVE)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  route            Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId, dayOfWeek])
+  @@map("schedules")
+}
+
+// ==========================================
+// 6. Vehicles & Trips (Flota y Despachos)
+// ==========================================
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_SERVICE
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+model Vehicle {
+  id           String            @id @default(uuid()) @db.Uuid
+  internalCode String            @unique // e.g. "DISCO-04", "DISCO-08"
+  plate        String            @unique // e.g. "GAA-1004"
+  capacity     Int               @default(45)
+  year         Int?
+  type         String?           @default("BUS")
+  status       VehicleStatus     @default(AVAILABLE)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  trips        Trip[]
+  positions    VehiclePosition[]
+  incidents    Incident[]
+
+  @@index([internalCode])
+  @@index([status])
+  @@map("vehicles")
+}
+
+enum TripStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Trip {
+  id             String            @id @default(uuid()) @db.Uuid
+  routeId        String            @db.Uuid
+  vehicleId      String            @db.Uuid
+  driverId       String?           @db.Uuid
+  serviceDate    DateTime          @db.Date
+  scheduledStart DateTime
+  actualStart    DateTime?
+  actualEnd      DateTime?
+  status         TripStatus        @default(SCHEDULED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  route          Route             @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver         User?             @relation("DriverTrips", fields: [driverId], references: [id], onDelete: SetNull)
+  positions      VehiclePosition[]
+  alerts         Alert[]
+  incidents      Incident[]
+
+  @@index([routeId, serviceDate])
+  @@index([status])
+  @@map("trips")
+}
+
+// ==========================================
+// 7. Telemetry & Positions (Posiciones)
+// ==========================================
+
+enum PositionStatus {
+  REAL_TIME_AVAILABLE
+  REAL_TIME_UNAVAILABLE
+  STALE
+}
+
+model VehiclePosition {
+  id         String         @id @default(uuid()) @db.Uuid
+  vehicleId  String         @db.Uuid
+  tripId     String?        @db.Uuid
+  latitude   Float
+  longitude  Float
+  speed      Float?         // km/h
+  heading    Float?         // 0 - 360 grados
+  accuracy   Float?         // metros
+  source     String         @default("AVL_GPS") // "AVL_GPS", "MOBILE_DRIVER", "SIMULATOR"
+  status     PositionStatus @default(REAL_TIME_AVAILABLE)
+  timestamp  DateTime       @default(now())
+
+  vehicle    Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  trip       Trip?          @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, timestamp])
+  @@index([tripId, timestamp])
+  @@map("vehicle_positions")
+}
+
+// ==========================================
+// 8. Service Status, Alerts & Incidents
+// ==========================================
+
+enum ServiceStatusType {
+  NORMAL
+  DELAYED
+  ROUTE_MODIFIED
+  STOP_CLOSED
+  SERVICE_SUSPENDED
+}
+
+model ServiceStatusRecord {
+  id          String            @id @default(uuid()) @db.Uuid
+  scope       String            @default("SYSTEM") // "SYSTEM", "ROUTE", "STOP"
+  targetId    String?           @db.Uuid
+  status      ServiceStatusType @default(NORMAL)
+  title       String            @default("Estado de Servicio")
+  reason      String?
+  description String?
+  startsAt    DateTime          @default(now())
+  endsAt      DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([scope, targetId])
+  @@map("service_status_records")
+}
+
+enum AlertType {
+  DELAY
+  ROUTE_CHANGE
+  STOP_CLOSURE
+  INTERRUPTION
+  SERVICE_NOTICE
+  OTHER
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Alert {
+  id          String        @id @default(uuid()) @db.Uuid
+  type        AlertType
+  priority    AlertPriority @default(MEDIUM)
+  title       String
+  message     String
+  routeId     String?       @db.Uuid
+  stopId      String?       @db.Uuid
+  tripId      String?       @db.Uuid
+  startsAt    DateTime      @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean       @default(true)
+  createdById String?       @db.Uuid
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  route       Route?        @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  stop        Stop?         @relation(fields: [stopId], references: [id], onDelete: SetNull)
+  trip        Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("AlertCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([isActive, startsAt])
+  @@index([routeId])
+  @@map("alerts")
+}
+
+enum IncidentType {
+  BREAKDOWN
+  DELAY
+  BLOCKED_STOP
+  ACCIDENT
+  CONGESTION
+  DETOUR
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+model Incident {
+  id          String           @id @default(uuid()) @db.Uuid
+  type        IncidentType
+  severity    IncidentSeverity @default(MEDIUM)
+  description String
+  vehicleId   String?          @db.Uuid
+  routeId     String?          @db.Uuid
+  stopId      String?          @db.Uuid
+  tripId      String?          @db.Uuid
+  latitude    Float?
+  longitude   Float?
+  status      IncidentStatus   @default(OPEN)
+  occurredAt  DateTime         @default(now())
+  resolvedAt  DateTime?
+  createdById String?          @db.Uuid
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  vehicle     Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  route       Route?           @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  stop        Stop?            @relation(fields: [stopId], references: [id], onDelete: SetNull)
+  trip        Trip?            @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  createdBy   User?            @relation("IncidentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([routeId])
+  @@map("incidents")
+}
+
+// ==========================================
+// 9. Audit Logs (Trazabilidad Administrativa)
+// ==========================================
+
+model AuditLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  actorId       String?   @db.Uuid
+  action        String    // e.g. "CREATE_ROUTE", "UPDATE_STOP_STATUS", "DISPATCH_TRIP"
+  entityType    String    // e.g. "Route", "Stop", "Schedule", "Incident"
+  entityId      String?
+  previousValue Json?     // Snapshot previo
+  newValue      Json?     // Snapshot nuevo
+  metadata      Json?     // IP, UserAgent, headers
+  ipAddress     String?
+  timestamp     DateTime  @default(now())
+
+  actor         User?     @relation("UserAudits", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}

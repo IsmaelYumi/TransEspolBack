@@ -1,0 +1,1533 @@
+{
+  "info": {
+    "_postman_id": "c8e3a2b1-5f4d-4e9a-9b7c-1d2e3f4a5b6c",
+    "name": "TransEspol - Mobility Backend API",
+    "description": "# ESPOL MOVE ALERT — Mobility Backend API\n\nColección oficial de Postman para el backend de movilidad interna de ESPOL (Campus Gustavo Galindo Velasco).\n\n### 🚀 Características principales:\n- **Autenticación Institucional Microsoft:** Tokens JWT emitidos tras validar cuentas `@espol.edu.ec`.\n- **Bypass de Desarrollo (Mock):** Permite iniciar sesión localmente con `mock_espol_admin`, `mock_espol_driver` y `mock_espol_student` sin requerir Azure AD configurado.\n- **Scripts Automáticos de Auth:** Al ejecutar cualquier login de la carpeta **01. Autenticación**, el token JWT se almacena automáticamente en la variable de colección `{{authToken}}`.\n- **Rastreo en Tiempo Real & Redis:** Endpoints para consultar caché en memoria de 120s y geo-búsquedas con Redis `GEOADD` / `GEORADIUS`.\n- **Planificación de Viajes (Journey Planning):** Algoritmo de compatibilidad directa entre paradas y POIs.\n- **Auditoría e Incidencias:** Trazabilidad completa para administradores y operadores.\n\n### ⚙️ Variables de Entorno / Colección:\n- `baseUrl`: URL base de la API (por defecto: `http://localhost:3000/api/v1`).\n- `authToken`: Token JWT Bearer generado tras el login.\n- `routeId`, `stopId`, `busId`, etc.: Identificadores para pruebas rápidas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string",
+      "description": "URL base del API con prefijo de versión"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "Token JWT del usuario activo (se auto-asigna al hacer login)"
+    },
+    {
+      "key": "routeId",
+      "value": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "type": "string",
+      "description": "UUID de prueba para rutas"
+    },
+    {
+      "key": "stopId",
+      "value": "550e8400-e29b-41d4-a716-446655440001",
+      "type": "string",
+      "description": "UUID de prueba para paradas"
+    },
+    {
+      "key": "busId",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string",
+      "description": "UUID de prueba para buses / vehículos"
+    },
+    {
+      "key": "driverId",
+      "value": "550e8400-e29b-41d4-a716-446655440002",
+      "type": "string",
+      "description": "UUID de prueba para conductores (operadores)"
+    },
+    {
+      "key": "campusId",
+      "value": "550e8400-e29b-41d4-a716-446655440003",
+      "type": "string",
+      "description": "UUID de prueba para campus"
+    },
+    {
+      "key": "buildingId",
+      "value": "550e8400-e29b-41d4-a716-446655440004",
+      "type": "string",
+      "description": "UUID de prueba para edificios / facultades"
+    },
+    {
+      "key": "incidentId",
+      "value": "550e8400-e29b-41d4-a716-446655440005",
+      "type": "string",
+      "description": "UUID de prueba para incidencias"
+    },
+    {
+      "key": "alertId",
+      "value": "550e8400-e29b-41d4-a716-446655440006",
+      "type": "string",
+      "description": "UUID de prueba para alertas"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Autenticación (Auth)",
+      "description": "Endpoints de inicio de sesión institucional ESPOL y verificación de sesión.",
+      "item": [
+        {
+          "name": "Login con Microsoft - Rol Administrador (Dev Mock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.tokens && json.tokens.accessToken) {",
+                  "        pm.collectionVariables.set('authToken', json.tokens.accessToken);",
+                  "        console.log('[TransEspol] Token ADMIN guardado en variable {{authToken}}');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"mock_espol_admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/microsoft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "microsoft"
+              ]
+            },
+            "description": "Inicia sesión simulando una cuenta institucional de Administrador (`admin.transporte@espol.edu.ec`). Retorna y guarda automáticamente el token JWT en `{{authToken}}`."
+          },
+          "response": []
+        },
+        {
+          "name": "Login con Microsoft - Rol Operador / Conductor (Dev Mock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.tokens && json.tokens.accessToken) {",
+                  "        pm.collectionVariables.set('authToken', json.tokens.accessToken);",
+                  "        console.log('[TransEspol] Token OPERATOR guardado en variable {{authToken}}');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"mock_espol_driver\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/microsoft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "microsoft"
+              ]
+            },
+            "description": "Inicia sesión simulando una cuenta institucional de Conductor / Operador (`conductor.transporte@espol.edu.ec`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Login con Microsoft - Rol Pasajero / Estudiante (Dev Mock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.tokens && json.tokens.accessToken) {",
+                  "        pm.collectionVariables.set('authToken', json.tokens.accessToken);",
+                  "        console.log('[TransEspol] Token PASSENGER guardado en variable {{authToken}}');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"mock_espol_student\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/microsoft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "microsoft"
+              ]
+            },
+            "description": "Inicia sesión simulando un estudiante politécnico (`iyumi@espol.edu.ec`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Login con Microsoft - Token Real Azure AD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.tokens && json.tokens.accessToken) {",
+                  "        pm.collectionVariables.set('authToken', json.tokens.accessToken);",
+                  "        console.log('[TransEspol] Token JWT real guardado en {{authToken}}');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/microsoft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "microsoft"
+              ]
+            },
+            "description": "Autenticación de producción enviando el Bearer / ID Token obtenido desde Azure AD / Microsoft OAuth2."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Perfil del Usuario Autenticado (Me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Retorna los datos del usuario extraídos de la sesión JWT actual. Requiere token en `{{authToken}}`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02. Monitoreo y Salud (Health)",
+      "description": "Monitoreo del estado de salud de la API, PostgreSQL (Prisma 7) y Redis.",
+      "item": [
+        {
+          "name": "Health Check del Sistema",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Comprueba latencia con la base de datos PostgreSQL, disponibilidad de Redis y tiempo de actividad."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03. Rutas y Recorridos (Routes)",
+      "description": "Catálogo de recorridos oficiales de entrada y salida del campus.",
+      "item": [
+        {
+          "name": "Listar Todas las Rutas",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/routes?status=ACTIVE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "routes"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "Filtro opcional por estado: ACTIVE, INACTIVE, DETOUR"
+                }
+              ]
+            },
+            "description": "Retorna el listado de rutas de transporte junto con sus paradas y orden de secuencia."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Ruta con Buses en Tiempo Real (Redis)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/routes/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "routes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{routeId}}",
+                  "description": "UUID de la ruta a consultar"
+                }
+              ]
+            },
+            "description": "Retorna información completa de la ruta, paradas asociadas y buses activos en tránsito obtenidos desde la caché Redis (TTL 120s)."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Nueva Ruta (Solo Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"R-CAMPUS-EXPRESS\",\n  \"name\": \"Ruta Express Campus - Rectorado\",\n  \"description\": \"Servicio prioritario directo desde Garita hasta Rectorado sin escalas intermedias\",\n  \"colorHex\": \"#0047AB\",\n  \"polyline\": \"encoded_polyline_geojson_string\",\n  \"schedule\": \"06:45 - 20:30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/routes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "routes"
+              ]
+            },
+            "description": "Permite a los administradores registrar un nuevo recorrido independiente en el catálogo. Requiere rol ADMIN."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04. Paradas Oficiales (Stops)",
+      "description": "Directorio de paradas del campus y búsqueda espacial por cercanía.",
+      "item": [
+        {
+          "name": "Listar Paradas Activas del Campus",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stops",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stops"
+              ]
+            },
+            "description": "Lista todas las paradas operativas dentro del campus politécnico con sus coordenadas WGS84."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Paradas Cercanas por Radio Geográfico",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stops/nearby?lat=-2.1465&lng=-79.9664&radiusKm=1.0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stops",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "-2.1465",
+                  "description": "Latitud del punto de referencia (ej: FIEC)"
+                },
+                {
+                  "key": "lng",
+                  "value": "-79.9664",
+                  "description": "Longitud del punto de referencia"
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "1.0",
+                  "description": "Radio de búsqueda en kilómetros"
+                }
+              ]
+            },
+            "description": "Calcula las paradas más cercanas a una posición geográfica dada."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Parada por ID",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stops/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stops",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{stopId}}",
+                  "description": "UUID de la parada"
+                }
+              ]
+            },
+            "description": "Obtiene información detallada de una parada física específica."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05. Horarios Programados (Schedules)",
+      "description": "Frecuencias teóricas y franjas de operación diurna/nocturna.",
+      "item": [
+        {
+          "name": "Consultar Todos los Horarios Vigentes",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules"
+              ]
+            },
+            "description": "Retorna el catálogo completo de horarios oficiales del sistema de transporte."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar Horarios de una Ruta Específica",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/routes/:routeId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schedules",
+                "routes",
+                ":routeId"
+              ],
+              "variable": [
+                {
+                  "key": "routeId",
+                  "value": "{{routeId}}",
+                  "description": "UUID de la ruta"
+                }
+              ]
+            },
+            "description": "Retorna los horarios programados por día de la semana y frecuencias para la ruta solicitada."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06. Campus y Puntos de Interés (Campus & POIs)",
+      "description": "Estructura física del campus Gustavo Galindo, facultades y edificios.",
+      "item": [
+        {
+          "name": "Listar Sedes y Campus de ESPOL",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campus"
+              ]
+            },
+            "description": "Obtiene las sedes universitarias registradas con sus respectivos edificios."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Facultades y Edificios",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campus/buildings?campusId={{campusId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campus",
+                "buildings"
+              ],
+              "query": [
+                {
+                  "key": "campusId",
+                  "value": "{{campusId}}",
+                  "description": "Filtro opcional por UUID de campus"
+                }
+              ]
+            },
+            "description": "Lista todas las facultades y dependencias administrativas del campus."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Puntos de Interés (POIs)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/campus/pois?buildingId={{buildingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "campus",
+                "pois"
+              ],
+              "query": [
+                {
+                  "key": "buildingId",
+                  "value": "{{buildingId}}",
+                  "description": "Filtro opcional por UUID de edificio"
+                }
+              ]
+            },
+            "description": "Lista laboratorios, auditorios, comedores y áreas deportivas de interés para la comunidad."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07. Flota de Buses (Buses)",
+      "description": "Gestión de unidades vehiculares, asignaciones de ruta y cambios de estado operativo.",
+      "item": [
+        {
+          "name": "Listar Flota Completa de Buses",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/buses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "buses"
+              ]
+            },
+            "description": "Retorna todas las unidades vehiculares, placas, capacidad y estados operacionales."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Información de un Bus por ID",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/buses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "buses",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{busId}}",
+                  "description": "UUID del bus"
+                }
+              ]
+            },
+            "description": "Retorna los detalles de la unidad, conductor asignado y estado."
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Conductor y/o Ruta a Bus (Admin / Despachador)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": \"{{routeId}}\",\n  \"driverId\": \"{{driverId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/buses/:id/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "buses",
+                ":id",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{busId}}",
+                  "description": "UUID del bus a asignar"
+                }
+              ]
+            },
+            "description": "Asigna un bus a un circuito operativo y conductor institucional. Requiere rol ADMIN u OPERATOR (Dispatcher)."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Estado Operativo del Bus (Admin / Conductor)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_SERVICE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/buses/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "buses",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{busId}}",
+                  "description": "UUID del bus"
+                }
+              ]
+            },
+            "description": "Cambia el estado del bus entre: AVAILABLE, IN_SERVICE, MAINTENANCE, OUT_OF_SERVICE. Requiere rol ADMIN u OPERATOR (Driver)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08. Planificación de Viajes (Journey Planning)",
+      "description": "Búsqueda y evaluación de rutas compatibles entre paradas/POIs sin inventar tiempos ficticios.",
+      "item": [
+        {
+          "name": "Planificar Viaje por Coordenadas Geográficas",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originLat\": -2.1445,\n  \"originLng\": -79.965,\n  \"destLat\": -2.1465,\n  \"destLng\": -79.9664\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/journeys/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "journeys",
+                "plan"
+              ]
+            },
+            "description": "Identifica paradas cercanas, evalúa rutas directas compatibles, secuencias válidas y restricciones de subida/bajada."
+          },
+          "response": []
+        },
+        {
+          "name": "Planificar Viaje por Puntos de Interés (POIs)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originPoiId\": \"{{buildingId}}\",\n  \"destPoiId\": \"{{buildingId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/journeys/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "journeys",
+                "plan"
+              ]
+            },
+            "description": "Permite seleccionar dos facultades o edificios para encontrar los buses y rutas que conectan ambos puntos."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09. Rastreo y Telemetría en Vivo (Tracking)",
+      "description": "Caché de alta velocidad en Redis (TTL 120s) e indexación espacial GEO.",
+      "item": [
+        {
+          "name": "Obtener Coordenadas de Buses en Vivo (Redis Cache)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tracking/live?routeId={{routeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking",
+                "live"
+              ],
+              "query": [
+                {
+                  "key": "routeId",
+                  "value": "{{routeId}}",
+                  "description": "Filtro opcional por ruta"
+                }
+              ]
+            },
+            "description": "Consulta directamente la memoria caché de Redis para obtener ubicaciones de unidades activas sin sobrecargar PostgreSQL."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Buses Cercanos (Redis GEORADIUS)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tracking/nearby?lat=-2.1465&lng=-79.9664&radiusKm=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "-2.1465",
+                  "description": "Latitud"
+                },
+                {
+                  "key": "lng",
+                  "value": "-79.9664",
+                  "description": "Longitud"
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "2",
+                  "description": "Radio de búsqueda en km"
+                }
+              ]
+            },
+            "description": "Utiliza el índice espacial `GEOADD` / `GEORADIUS` de Redis para ubicar buses cercanos al usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "Última Coordenada en Memoria de un Bus (TTL 120s)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tracking/buses/:busId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking",
+                "buses",
+                ":busId"
+              ],
+              "variable": [
+                {
+                  "key": "busId",
+                  "value": "{{busId}}",
+                  "description": "UUID del bus"
+                }
+              ]
+            },
+            "description": "Obtiene el último paquete de telemetría de una unidad específica. Si el bus no envía señal en 120s, se considera fuera de línea."
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar Telemetría GPS vía HTTP REST (Fallback WebSockets)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"busId\": \"{{busId}}\",\n  \"routeId\": \"{{routeId}}\",\n  \"latitude\": -2.1465,\n  \"longitude\": -79.9664,\n  \"speed\": 32.5,\n  \"heading\": 180,\n  \"accuracy\": 4.2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tracking/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tracking",
+                "update"
+              ]
+            },
+            "description": "Permite a hardware IoT o smartphones de conductores enviar coordenadas vía REST cuando no hay conexión WebSockets continua. Actualiza Redis y retransmite a Socket.IO."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Ingesta de Telemetría AVL / GPS (Telemetry)",
+      "description": "Capa de ingesta agnóstica para hardware embarcado y proveedores GPS externos.",
+      "item": [
+        {
+          "name": "Ingestar Coordenadas GPS/AVL de Hardware Embarcado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleId\": \"{{busId}}\",\n  \"routeId\": \"{{routeId}}\",\n  \"tripId\": null,\n  \"latitude\": -2.1465,\n  \"longitude\": -79.9664,\n  \"speed\": 28.5,\n  \"heading\": 180,\n  \"accuracy\": 4.5,\n  \"source\": \"AVL_GPS\",\n  \"timestamp\": \"2026-10-04T17:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/telemetry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "telemetry"
+              ]
+            },
+            "description": "Punto de entrada desacoplado para hardware GPS/AVL. Valida vehículo y coordenadas, almacena en Redis (TTL 120s) y retransmite vía WebSockets. Requiere rol OPERATOR o ADMIN."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Estado Operacional del Servicio (Service Status)",
+      "description": "Semáforo del servicio y estado global de la red de transporte de ESPOL.",
+      "item": [
+        {
+          "name": "Consultar Estado Global del Servicio (Semáforo)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/service-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "service-status"
+              ]
+            },
+            "description": "Endpoint público consultado por la app de pasajeros para verificar si el transporte opera normal, con retraso, desvío o suspendido."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Estado Operacional del Servicio (Operador / Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scope\": \"SYSTEM\",\n  \"targetId\": null,\n  \"status\": \"NORMAL\",\n  \"title\": \"Servicio de Movilidad Operando Regularmente\",\n  \"description\": \"Todas las rutas de entrada y salida operan en sus frecuencias habituales cada 15 min.\",\n  \"reason\": \"Operación regular diurna\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/service-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "service-status"
+              ]
+            },
+            "description": "Permite a operadores o administradores cambiar el semáforo del servicio (NORMAL, DELAYED, ROUTE_MODIFIED, STOP_CLOSED, SERVICE_SUSPENDED). Registra autor e IP en auditoría."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12. Alertas y Notificaciones (Alerts)",
+      "description": "Avisos de retraso, desvíos, suspensión de paradas y comunicados a pasajeros.",
+      "item": [
+        {
+          "name": "Consultar Alertas Activas de Servicio",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts?routeId={{routeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "routeId",
+                  "value": "{{routeId}}",
+                  "description": "Filtro opcional por ruta"
+                }
+              ]
+            },
+            "description": "Lista todas las alertas no resueltas visibles para los pasajeros en la aplicación móvil o web."
+          },
+          "response": []
+        },
+        {
+          "name": "Publicar Alerta Operativa (Operador / Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DELAY\",\n  \"priority\": \"MEDIUM\",\n  \"title\": \"Retraso temporal en Ruta Entrada Normal\",\n  \"message\": \"Congestión vehicular a la altura de Rectorado. Retraso estimado de 5 minutos.\",\n  \"routeId\": \"{{routeId}}\",\n  \"stopId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ]
+            },
+            "description": "Crea y difunde una alerta en tiempo real a los pasajeros y conductores. Requiere rol OPERATOR o ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver / Desactivar Alerta (Operador / Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/:id/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                ":id",
+                "resolve"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{alertId}}",
+                  "description": "UUID de la alerta a resolver"
+                }
+              ]
+            },
+            "description": "Marca una alerta como resuelta para que deje de mostrarse activamente a los usuarios."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "13. Incidencias Operativas (Incidents)",
+      "description": "Registro y resolución de incidentes (averías mecánicas, paradas bloqueadas, accidentes).",
+      "item": [
+        {
+          "name": "Listar Incidencias Abiertas (Operador / Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/incidents?routeId={{routeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ],
+              "query": [
+                {
+                  "key": "routeId",
+                  "value": "{{routeId}}",
+                  "description": "Filtro opcional por ruta"
+                }
+              ]
+            },
+            "description": "Lista las incidencias operativas actualmente en estado OPEN o IN_PROGRESS. Requiere rol OPERATOR o ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar Nueva Incidencia Operativa (Operador / Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"BLOCKED_STOP\",\n  \"severity\": \"MEDIUM\",\n  \"description\": \"Vehículo particular bloquea la bahía de la Parada FIEC.\",\n  \"routeId\": \"{{routeId}}\",\n  \"stopId\": \"{{stopId}}\",\n  \"vehicleId\": \"{{busId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents"
+              ]
+            },
+            "description": "Registra una contingencia operativa en ruta o parada. Se audita automáticamente en la base de datos."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Estado de Incidencia (Operador / Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/incidents/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "incidents",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{incidentId}}",
+                  "description": "UUID de la incidencia"
+                }
+              ]
+            },
+            "description": "Actualiza el estado de la incidencia (OPEN, IN_PROGRESS, RESOLVED, CANCELLED)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "14. Auditoría Administrativa (Audit Logs)",
+      "description": "Trazabilidad completa de modificaciones y acciones administrativas en el sistema.",
+      "item": [
+        {
+          "name": "Consultar Registros de Auditoría (Solo Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Cantidad máxima de eventos a retornar"
+                }
+              ]
+            },
+            "description": "Permite reconstruir quién modificó qué entidad, cuándo, desde qué IP y qué campos cambiaron (previo vs nuevo). Solo accesible por ADMIN."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
